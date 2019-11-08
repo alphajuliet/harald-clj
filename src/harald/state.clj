@@ -47,6 +47,8 @@
   [n]
   (comp (l/key :villages) (l/nth n)))
 
+(defn _hand_card [n t] (comp (_hand n) (l/key t)))
+(defn _village_card [n t] (comp (_village n) (l/key t)))
 (def _reserve (l/key :reserve))
 (def _council (l/key :council))
 

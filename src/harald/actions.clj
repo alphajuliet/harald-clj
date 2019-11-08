@@ -30,21 +30,24 @@
 (defn deal-reserve
   "Deal a card into the Reserve."
   [st]
-  (update st :reserve (h/hash-add (deal-card))))
+  (l/over _reserve (partial h/hash-add (deal-card)) st))
+
+(def >>> comp)
 
 ;; move-card :: Card -> Hand -> Hand -> State -> State
 (defn move-card
-  "Move a card of type t from the src hand to the dest hand, e.g. (move-card :blk [:hand 1] [:council] s0)."
+  "Move a card of type t from the src hand to the dest hand.
+   e.g. (move-card :blk (_hand 1) _council s0)."
   [t _src _dest st]
 
   ;; Ensure the card is available
-  (if (or (not (contains? (get-in st _src) t))
-          (<= (get-in st (conj _src t)) 0))
+  (if (or (not (contains? (l/focus _src st) t))
+          (<= (l/focus (comp _src (l/key t)) st) 0))
     (throw (Exception.
             (format "### Error: card %s not available to move" t)))
-    (-> st
-        (update-in _dest (partial h/hash-add {t 1}))
-        (update-in _src (partial h/hash-sub {t 1})))))
+    (->> st
+         (l/over _dest (partial h/hash-add {t 1}))
+         (l/over _src (partial h/hash-sub {t 1})))))
 
 
 ;; swap-cards :: Card -> Lens Hand -> Card -> Lens Hand -> State -> State
@@ -59,8 +62,7 @@
 (defn invert
   "Turn over a card, e.g. (invert 'Sea) => 'SeaX."
   [c]
-  (all-cards (mod (+ 6 (.indexOf all-cards c))
-                  12)))
+  (all-cards (mod (+ 6 (.indexOf all-cards c)) 12)))
 
 ;; turn-over-card :: Card -> Lens Hand -> State -> State
 (defn turn-over-card
