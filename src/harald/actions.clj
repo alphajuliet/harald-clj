@@ -13,13 +13,13 @@
 
 ;; deal-card :: Card
 (defn deal-card
-  "Pick a random card."
+  "Select a random card."
   []
   {(r/rand-nth card-types) 1})
 
 ;; deal-n-cards :: Integer -> Hand -> Hand
 (defn deal-n-cards
-  "Deal n random cards to a given hand."
+  "Deal n random cards to a given pile."
   [n init-h]
   (reduce (fn [m _]
             (h/hash-add (deal-card) m))
@@ -27,12 +27,12 @@
           (range n)))
 
 ;; deal-reserve :: State -> State
-(defn deal-reserve
-  "Deal a card into the Reserve."
-  [st]
-  (l/over _reserve (partial h/hash-add (deal-card)) st))
+(defn deal-to
+  "Deal a card to a pile."
+  [_dest st]
+  (l/over _dest (partial h/hash-add (deal-card)) st))
 
-(def >>> comp)
+#_(def >>> comp)
 
 ;; move-card :: Card -> Hand -> Hand -> State -> State
 (defn move-card
@@ -72,8 +72,8 @@
     (throw (Exception.
             (format "### Card %s doesn't exist to turn over." card)))
     (->> st
-        (l/over _h #(h/hash-sub % {card 1}))
-        (l/over _h #(h/hash-add % {(invert card) 1})))))
+         (l/over _h #(h/hash-sub % {card 1}))
+         (l/over _h #(h/hash-add % {(invert card) 1})))))
 
 ;===============================
 ;; Game actions
@@ -100,10 +100,9 @@
 (defn init-game
   "Define the initial state."
   [nplayers seed]
+  {:pre [(<= 2 nplayers 4)]}
 
-  (if-not (<= 2 nplayers 4)
-    (throw (Exception. "### The game needs 2-4 players."))
-    (r/set-random-seed! seed))
+  (r/set-random-seed! seed)
 
   {:council {}
    :villages (vec (repeat nplayers {}))
@@ -128,53 +127,53 @@
   [plyr card st]
   (->> st
        (move-card card _reserve (_hand plyr))
-       (deal-reserve)))
+       (deal-to _reserve)))
 
 ;-----------------------
 ; 
 ; turn-over-cards :: [(Card (Lens Hand)] -> State -> State
 (defn turn-over-cards
-  "(Blk effect) Turn over up to two cards in any two different villages or council.
-   e.g. (turn-over-cards '((:blk (_hand 0)) (:mer _council) s0)"
+  "(Blk effect) Turn over 0-2 cards in different villages or the council.
+   e.g. (turn-over-cards [:blk (_hand 0) :mer _council] s0)"
   [xs st]
-  (cond (> (count xs) 2)
-        (throw (Exception. "Can only turn over max 2 cards.")))
-
-  (for [state st
-        x xs]
-    (turn-over-card (first x) (eval (second x)) state)))
+  {:pre [(<= 0 (count xs) 4)]}
+  (reduce (fn [s x]
+            (turn-over-card (first x) (second x) s))
+          st
+          (partition 2 xs)))
 
 ;-----------------------
 ;; return-card :: Player -> Card -> State -> State
 (defn return-card
-  "(War effect) Throw away a card from any player's village and replace with a random card"
-  [p c st]
-  (->> st
-       (update-in [:village p c] dec)
-       (update-in [:village p] (h/hash-add (deal-card)))))
+  "(War effect) Throw away a card from any player's village and replace with a random card."
+  [plyr card st]
+  (if (nil? (l/focus (_village_card plyr card) st))
+    (throw (Exception. (format "### Card %s isn't available to remove." card)))
+    ;else
+    (->> st
+         (l/over (_village plyr) #(h/hash-sub % {card 1}))
+         (deal-to (_village plyr)))))
 
 ;;-----------------------
 ;; swap-hand-card :: Player -> Card -> Card -> State -> State
 (defn swap-hand-card
   "(Brd effect) Swap a hand card with your village card, e.g. (swap-hand-card 'Brd 0 'Mer s0)."
-  [p ch cv st]
-  (swap-cards ch [:hand p] cv [:village p] st))
+  [plyr ch cv st]
+  (swap-cards ch (_hand plyr) cv (_village plyr) st))
 
 ;-----------------------
-; 
 ; swap-council-card :: Player -> Card -> Card -> State -> State
 (defn swap-council-card
   "(Sea effect) Swap any village card with a council card, e.g. (swap-council-card 'Brd 0 'Mer s0)."
   [p cv cc st]
-  (swap-cards cv [:village p] cc [:council] st))
+  (swap-cards cv (_village p) cc _council st))
 
 ;-----------------------
-; 
 ; swap-village-card :: Player -> Card -> Player -> Card -> State -> State
 (defn swap-village-card
   "(Mer effect) Swap two village cards."
   [p1 cv1 p2 cv2 st]
-  (swap-cards cv1 [:village p1] cv2 [:village p2] st))
+  (swap-cards cv1 (_village p1) cv2 (_village p2) st))
 
 
 ;-----------------------
@@ -182,27 +181,25 @@
   "Fold a list of actions over an initial state and record the game state."
   [act init-state]
   (eval
-   (conj act (vec init-state))))
+   (into (list init-state) (reverse act))))
 
 ; apply-actions :: [(m ... -> State -> State)] -> State -> State
 (defn apply-actions
   "Apply a sequence of actions to a given state."
   [lst init-state]
-  (reduce apply-action init-state lst))
+  (reduce (fn [s a] (apply-action a s)) 
+          init-state 
+          lst))
 
 ;-----------------------
 ; Example data
 (def s0
   "Default state.:"
-  (init-game 2 0))
+  (init-game 3 0))
 
-#_(def actions
-    (vec '(play-cards 0 :mer :sea)
-         '(swap-council-card 0 :sea :mer)
-         '(take-reserve-card 0 :war)))
-
-;========================
-; Unit tests
-
+(def actions
+  (list '(play-cards 0 :mer :sea)
+        '(swap-council-card 0 :sea :mer)
+        '(take-reserve-card 0 :sct)))
 
 ; The End

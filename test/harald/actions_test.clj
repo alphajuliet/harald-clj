@@ -54,7 +54,25 @@
       (is (= 1 (l/focus (_card _council :mer) s1)))
       (is (= 1 (l/focus (_village_card 0 :sea) s1)))
       (is (= 3 (h/hash-sum (l/focus (_hand 0) s2))))
-      (is (= 4 (h/hash-sum (l/focus (_hand 0) s3)))))))
+      (is (= 4 (h/hash-sum (l/focus (_hand 0) s3))))))
+  
+  (testing "Game actions: turn-over-cards"
+    (let [s0 (init-game 3 0)
+          s1 (turn-over-cards [:mer (_hand 0) :brd _reserve] s0)]
+      (is (= 1 (l/focus (_hand_card 0 :merX) s1)))
+      (is (= 1 (l/focus (_card _reserve :brdX) s1)))))
+  
+  (testing "Game actions: return-card"
+    (let [s0 (init-game 3 0)
+          s1 (play-cards 0 :mer :sea s0)
+          s2 (return-card 0 :sea s1)]
+      (is (= 3 (count (l/focus (_hand 0) s2))))))
+  
+  (testing "Game actions: swap-hand-card"
+    (let [s0 (init-game 3 0)
+          s1 (play-cards 0 :mer :sea s0)
+          s2 (swap-hand-card 0 :war :sea s1)])
+    (is (= 1 (h/hash-sum (l/focus (_village 0) s2))))))
 
 
 ;; The End

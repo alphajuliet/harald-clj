@@ -50,9 +50,9 @@
 (def _reserve (l/key :reserve))
 (def _council (l/key :council))
 
-(defn _card [_h c] (comp _h (l/key c)))
-(defn _hand_card [n t] (_card (_hand n) t))
-(defn _village_card [n t] (_card (_village n) t))
+(defn _card [_h card] (comp _h (l/key card)))
+(defn _hand_card [plyr card] (_card (_hand plyr) card))
+(defn _village_card [plyr card] (_card (_village plyr) card))
 
 ;;-----------------------
 ;; score :: Hand -> Hand -> Integer
