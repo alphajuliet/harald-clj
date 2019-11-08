@@ -47,33 +47,33 @@
             (format "### Error: card %s not available to move" t)))
     (->> st
          (l/over _dest (partial h/hash-add {t 1}))
-         (l/over _src (partial h/hash-sub {t 1})))))
+         (l/over _src #(h/hash-sub % {t 1})))))
 
 
 ;; swap-cards :: Card -> Lens Hand -> Card -> Lens Hand -> State -> State
 (defn swap-cards
   "Swap two cards between two hands, i.e. exchange t1 from lens1 with t2 from lens2."
-  [t1 _lens1 t2 _lens2 st]
+  [c1 _lens1 c2 _lens2 st]
   (->> st
-       (move-card t1 _lens1 _lens2)
-       (move-card t2 _lens2 _lens1)))
+       (move-card c1 _lens1 _lens2)
+       (move-card c2 _lens2 _lens1)))
 
 ;; invert :: Card -> Card
 (defn invert
-  "Turn over a card, e.g. (invert 'Sea) => 'SeaX."
+  "Turn over a card, e.g. (invert :sea) => :seaX"
   [c]
   (all-cards (mod (+ 6 (.indexOf all-cards c)) 12)))
 
 ;; turn-over-card :: Card -> Lens Hand -> State -> State
 (defn turn-over-card
-  [c _h st]
-  (if (= 0 (get-in st (conj _h c)))
+  "Turn over an existing card"
+  [card _h st]
+  (if (nil? (l/focus (_card _h card) st))
     (throw (Exception.
-            (format "### Card %s doesn't exist to turn over." c)))
-    (-> st
-        (update-in _h #(h/hash-sub % {c 1}))
-        (update-in _h #(h/hash-add % {(invert c) 1})))))
-
+            (format "### Card %s doesn't exist to turn over." card)))
+    (->> st
+        (l/over _h #(h/hash-sub % {card 1}))
+        (l/over _h #(h/hash-add % {(invert card) 1})))))
 
 ;===============================
 ;; Game actions
@@ -115,26 +115,27 @@
 ;; make-turn :: Player -> Card -> Card -> State -> State
 (defn play-cards
   "Moves 1 and 2: play one card to council (cc) and one to the village (cv)."
-  [p cc cv st]
+  [plyr cc cv st]
   (->> st
-       (move-card cc p :council)
-       (move-card cv [:hand p] [:village p])))
+       (move-card cc (_hand plyr) _council)
+       (move-card cv (_hand plyr) (_village plyr))))
 
 ;-----------------------
 ; 
 ; take-reserve-card :: Player -> Card -> State -> State
 (defn take-reserve-card
   "Take a reserve card into a player's hand, and deal a new card to the reserve."
-  [p c st]
+  [plyr card st]
   (->> st
-       (move-card c :reserve ([:hand p]))
+       (move-card card _reserve (_hand plyr))
        (deal-reserve)))
 
 ;-----------------------
 ; 
 ; turn-over-cards :: [(Card (Lens Hand)] -> State -> State
 (defn turn-over-cards
-  "(Blk effect) Turn over up to two cards in any two different villages or council, e.g. (turn-over-cards '((:blk [:hand 0]) :mer [:council] s0)"
+  "(Blk effect) Turn over up to two cards in any two different villages or council.
+   e.g. (turn-over-cards '((:blk (_hand 0)) (:mer _council) s0)"
   [xs st]
   (cond (> (count xs) 2)
         (throw (Exception. "Can only turn over max 2 cards.")))

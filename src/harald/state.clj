@@ -47,10 +47,12 @@
   [n]
   (comp (l/key :villages) (l/nth n)))
 
-(defn _hand_card [n t] (comp (_hand n) (l/key t)))
-(defn _village_card [n t] (comp (_village n) (l/key t)))
 (def _reserve (l/key :reserve))
 (def _council (l/key :council))
+
+(defn _card [_h c] (comp _h (l/key c)))
+(defn _hand_card [n t] (_card (_hand n) t))
+(defn _village_card [n t] (_card (_village n) t))
 
 ;;-----------------------
 ;; score :: Hand -> Hand -> Integer
@@ -81,14 +83,14 @@
 (defn encode-hand
   "Encode the state as a vector with all types."
   [h]
-  (vals (h/hash-add null-hand h)))
+  (vec (vals (h/hash-add null-hand h))))
 
 (defn encode-state
   "Encode state in a compact form."
   [s]
-  (conj (encode-hand (:council s))
-        (flatten (map encode-hand (:hands s)))
-        (flatten (map encode-hand (:villages s)))
-        (encode-hand (:reserve s))))
+  (vector (encode-hand (:council s))
+          (vec (flatten (map encode-hand (:hands s))))
+          (vec (flatten (map encode-hand (:villages s))))
+          (encode-hand (:reserve s))))
 
 ;; The End
