@@ -114,19 +114,19 @@
 ;; make-turn :: Player -> Card -> Card -> State -> State
 (defn play-cards
   "Moves 1 and 2: play one card to council (cc) and one to the village (cv)."
-  [plyr cc cv st]
+  [player cc cv st]
   (->> st
-       (move-card cc (_hand plyr) _council)
-       (move-card cv (_hand plyr) (_village plyr))))
+       (move-card cc (_hand player) _council)
+       (move-card cv (_hand player) (_village player))))
 
 ;-----------------------
 ; 
 ; take-reserve-card :: Player -> Card -> State -> State
 (defn take-reserve-card
   "Take a reserve card into a player's hand, and deal a new card to the reserve."
-  [plyr card st]
+  [player card st]
   (->> st
-       (move-card card _reserve (_hand plyr))
+       (move-card card _reserve (_hand player))
        (deal-to _reserve)))
 
 ;-----------------------
@@ -135,71 +135,114 @@
 (defn turn-over-cards
   "(Blk effect) Turn over 0-2 cards in different villages or the council.
    e.g. (turn-over-cards [:blk (_hand 0) :mer _council] s0)"
-  [xs st]
-  {:pre [(<= 0 (count xs) 4)]}
+  [cards st]
+  {:pre [(<= 0 (count cards) 4)]}
   (reduce (fn [s x]
             (turn-over-card (first x) (second x) s))
           st
-          (partition 2 xs)))
+          (partition 2 cards)))
 
 ;-----------------------
 ;; return-card :: Player -> Card -> State -> State
 (defn return-card
   "(War effect) Throw away a card from any player's village and replace with a random card."
-  [plyr card st]
-  (if (nil? (l/focus (_village_card plyr card) st))
+  [player card st]
+  (if (nil? (l/focus (_village_card player card) st))
     (throw (Exception. (format "### Card %s isn't available to remove." card)))
     ;else
     (->> st
-         (l/over (_village plyr) #(h/hash-sub % {card 1}))
-         (deal-to (_village plyr)))))
+         (l/over (_village player) #(h/hash-sub % {card 1}))
+         (deal-to (_village player)))))
 
 ;;-----------------------
 ;; swap-hand-card :: Player -> Card -> Card -> State -> State
-(defn swap-hand-card
-  "(Brd effect) Swap a hand card with your village card, e.g. (swap-hand-card 'Brd 0 'Mer s0)."
-  [plyr ch cv st]
-  (swap-cards ch (_hand plyr) cv (_village plyr) st))
+(defn swap-hand-village
+  "(Brd effect) Swap a hand card with your village card. 
+  e.g. (swap-hand-village 0 :brd :mer s0)."
+  [player ch cv st]
+  (swap-cards ch (_hand player) cv (_village player) st))
 
 ;-----------------------
 ; swap-council-card :: Player -> Card -> Card -> State -> State
-(defn swap-council-card
-  "(Sea effect) Swap any village card with a council card, e.g. (swap-council-card 'Brd 0 'Mer s0)."
+(defn swap-village-council
+  "(Sea effect) Swap any village card with a council card. 
+   e.g. (swap-village-council 0 :brd :mer s0)."
   [p cv cc st]
   (swap-cards cv (_village p) cc _council st))
 
 ;-----------------------
 ; swap-village-card :: Player -> Card -> Player -> Card -> State -> State
-(defn swap-village-card
+(defn swap-village-village
   "(Mer effect) Swap two village cards."
   [p1 cv1 p2 cv2 st]
   (swap-cards cv1 (_village p1) cv2 (_village p2) st))
 
 
-;-----------------------
+;;-----------------------
+;; Dispatch on actions
+
+(defmulti do-action
+  "Apply a given action to the given state."
+  :action)
+
+(defmethod do-action :play-cards
+  [{:keys [action player cc cv state]}]
+  (play-cards player cc cv state))
+
+(defmethod do-action :take-reserve-card
+  [{:keys [action player cr state]}]
+  (take-reserve-card player cr state))
+
+(defmethod do-action :turn-over-cards
+  [{:keys [action cards state]}]
+  (turn-over-cards cards state))
+
+(defmethod do-action :return-card
+  [{:keys [action player card state]}]
+  (return-card player card state))
+
+(defmethod do-action :swap-hand-village
+  [{:keys [action player ch cv state]}]
+  (swap-hand-village player ch cv state))
+
+(defmethod do-action :swap-village-council
+  [{:keys [action player cv cc state]}]
+  (swap-village-council player cv cc state))
+
+(defmethod do-action :swap-village-village
+  [{:keys [action p1 cv1 p2 cv2 state]}]
+  (swap-village-village p1 cv1 p2 cv2 state))
+
+(defmethod do-action :default [{:keys [action]}]
+  (throw (Exception. (format "Unknown action: %s" action))))
+
 (defn apply-action
-  "Fold a list of actions over an initial state and record the game state."
-  [act init-state]
-  (eval
-   (into (list init-state) (reverse act))))
+  "Apply an action command to `state`."
+  [cmd state]
+  {:pre [(map? cmd)
+         (map? state)]}
+  (let [action (into cmd {:state state})]
+    (do-action action)))
 
 ; apply-actions :: [(m ... -> State -> State)] -> State -> State
-(defn apply-actions
-  "Apply a sequence of actions to a given state."
-  [lst init-state]
-  (reduce (fn [s a] (apply-action a s)) 
-          init-state 
-          lst))
+(defn apply-action-list
+  "Apply a list of actions to an initial state."
+  [cmds init-state]
+  (reduce (fn [st cmd] (apply-action cmd st))
+          init-state
+          cmds))
 
-;-----------------------
-; Example data
+;;-----------------------
+;; Example data
+
 (def s0
-  "Default state.:"
+  "Sample initial state."
   (init-game 3 0))
 
-(def actions
-  (list '(play-cards 0 :mer :sea)
-        '(swap-council-card 0 :sea :mer)
-        '(take-reserve-card 0 :sct)))
+(def a0
+  "Example action sequence."
+  [{:action :play-cards, :player 0, :cc :mer, :cv :sea}
+   {:action :swap-village-council, :player 0, :cv :sea, :cc :mer}
+   {:action :take-reserve-card, :player 0, :cr :sct}])
 
-; The End
+;; The End
