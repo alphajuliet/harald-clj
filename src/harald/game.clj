@@ -69,11 +69,13 @@
      :card c}))
 
 ;;-------------------------------
+;; get-pairs :: LensX -> State -> [[Card LensX]]
 (defn- get-pairs
   [h st]
   (->> (keys (l/focus (->lens h) st))
        (map #(vector % h))))
 
+;; get-location-cards :: State -> [[Card LensX]]
 (defn- get-location-cards
   "Return all the locations where cards can be turned over."
   [st]
@@ -82,6 +84,7 @@
        (reduce #(into %1 %2)
                (get-pairs :council st))))
 
+;; different-pile? :: ∀ a b, [[a b] [a b]] -> Boolean
 (defn- different-pile?
   "Ensure pairs of cards are in different piles."
   [pair]
@@ -89,7 +92,6 @@
           (second (second pair)))))
 
 ;; turn-over-cards-options :: State -> [Action]
-;; TODO: complete function
 (defn turn-over-cards-options
   "Generate all turn-over-cards actions."
   [st]
