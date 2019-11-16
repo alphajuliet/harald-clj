@@ -87,7 +87,7 @@
 ;;   6. Take card from reserve
 ;;
 ;; Effects
-;; - Turn over 0-2 village cards (Blacksmith effect)
+;; - Turn over 0-2 village or council cards (Blacksmith effect)
 ;; - Replace any village card with a random card (Warrior effect)
 ;; - Swap hand card with own village card (Bard effect)
 ;; - Swap any village card with a council card (Seafarer effect)
@@ -134,7 +134,7 @@
 ; turn-over-cards :: [(Card (Lens Hand)] -> State -> State
 (defn turn-over-cards
   "(Blk effect) Turn over 0-2 cards in different villages or the council.
-   e.g. (turn-over-cards [:blk (_hand 0) :mer _council] s0)"
+   e.g. (turn-over-cards [:blk (_village 0), :mer _council] s0)"
   [cards st]
   {:pre [(<= 0 (count cards) 4)]}
   (reduce (fn [s x]
@@ -235,9 +235,8 @@
 ;;-----------------------
 ;; Example data
 
-(def s0
-  "Sample initial state."
-  (init-game 3 0))
+(def s0 (init-game 3 0))
+(def s1 (play-cards 0 :mer :sea s0))
 
 (def a0
   "Example action sequence."

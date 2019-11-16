@@ -54,6 +54,7 @@
 (defn _hand_card [plyr card] (_card (_hand plyr) card))
 (defn _village_card [plyr card] (_card (_village plyr) card))
 
+(defn nplayers [st] (count (:villages st)))
 ;;-----------------------
 ;; score :: Hand -> Hand -> Integer
 (defn score
