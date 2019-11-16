@@ -130,17 +130,25 @@
        (deal-to _reserve)))
 
 ;-----------------------
-; 
-; turn-over-cards :: [(Card (Lens Hand)] -> State -> State
+(defn ->lens
+  "Convert a description to a lens"
+  [d]
+  (if (vector? d)
+    (comp (l/key (first d)) (l/nth (second d)))
+    ;else
+    (l/key d)))
+
+
+; turn-over-cards :: [[Card Hand]] -> State -> State
 (defn turn-over-cards
   "(Blk effect) Turn over 0-2 cards in different villages or the council.
-   e.g. (turn-over-cards [:blk (_village 0), :mer _council] s0)"
+   e.g. (turn-over-cards [[:blk [:village 0]], [:mer :council]] s0)"
   [cards st]
-  {:pre [(<= 0 (count cards) 4)]}
+  {:pre [(<= 0 (count cards) 2)]}
   (reduce (fn [s x]
-            (turn-over-card (first x) (second x) s))
+            (turn-over-card (first x) (->lens (second x)) s))
           st
-          (partition 2 cards)))
+          cards))
 
 ;-----------------------
 ;; return-card :: Player -> Card -> State -> State
@@ -206,12 +214,12 @@
   (swap-hand-village player ch cv state))
 
 (defmethod do-action :swap-village-council
-  [{:keys [action player cv cc state]}]
-  (swap-village-council player cv cc state))
+  [{:keys [action village cv cc state]}]
+  (swap-village-council village cv cc state))
 
 (defmethod do-action :swap-village-village
-  [{:keys [action p1 cv1 p2 cv2 state]}]
-  (swap-village-village p1 cv1 p2 cv2 state))
+  [{:keys [action v1 cv1 v2 cv2 state]}]
+  (swap-village-village v1 cv1 v2 cv2 state))
 
 (defmethod do-action :default [{:keys [action]}]
   (throw (Exception. (format "Unknown action: %s" action))))
