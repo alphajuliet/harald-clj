@@ -108,7 +108,8 @@
    :villages (vec (repeat nplayers {}))
    :hands (vec (repeatedly nplayers #(deal-n-cards 4 {})))
    :reserve (deal-n-cards 4 {})
-   :turn 1})
+   :scores (vec (repeat nplayers 0))
+   :turn 0})
 
 ;;----------------------- 
 ;; make-turn :: Player -> Card -> Card -> State -> State
@@ -185,12 +186,22 @@
   [p1 cv1 p2 cv2 st]
   (swap-cards cv1 (_village p1) cv2 (_village p2) st))
 
+;-----------------------
+(defn update-score
+  "Update the scores."
+  [st]
+  (l/put _scores (score-state st) st))
+
+(defn advance-turn
+  "Advance the turn number by one."
+  [st]
+  (l/over _turn inc st))
 
 ;;-----------------------
 ;; Dispatch on actions
 
 (defmulti do-action
-  "Apply a given action to the given state."
+  "Apply a given action to the given state and return a new state."
   :action)
 
 (defmethod do-action :play-cards
@@ -224,21 +235,31 @@
 (defmethod do-action :default [{:keys [action]}]
   (throw (Exception. (format "Unknown action: %s" action))))
 
+;; apply-action :: Action -> State -> State
 (defn apply-action
   "Apply an action command to `state`."
   [cmd state]
   {:pre [(map? cmd)
          (map? state)]}
-  (let [action (into cmd {:state state})]
-    (do-action action)))
+  (->> (into cmd {:state state}) ; first inject the current state
+       (do-action)))
 
-; apply-actions :: [(m ... -> State -> State)] -> State -> State
-(defn apply-action-list
-  "Apply a list of actions to an initial state."
+; apply-player-actions :: [(m ... -> State -> State)] -> State -> State
+(defn apply-player-actions
+  "Apply a series of actions in a player's turn to an initial state, update the scores, and increment the turn.
+  The first action must be `play-cards`, then an optional effect action, followed by two `take-reserve-card` actions."
   [cmds init-state]
-  (reduce (fn [st cmd] (apply-action cmd st))
-          init-state
-          cmds))
+  {:pre (<= 3 (count cmds) 4)}
+  (->> cmds
+       (reduce (fn [st cmd] (apply-action cmd st))
+               init-state)
+       (update-score)
+       (advance-turn)))
+
+(defn apply-game-actions
+  "Apply a sequence of player turn actions to `state`."
+  [actions state]
+  (reduce (fn [st acts] (apply-player-actions acts st)) state actions))
 
 ;;-----------------------
 ;; Example data
@@ -248,8 +269,12 @@
 
 (def a0
   "Example action sequence."
-  [{:action :play-cards, :player 0, :cc :mer, :cv :sea}
-   {:action :swap-village-council, :player 0, :cv :sea, :cc :mer}
-   {:action :take-reserve-card, :player 0, :cr :sct}])
+  [[{:action :play-cards, :player 0, :cc :mer, :cv :mer}
+    {:action :take-reserve-card, :player 0, :cr :sea}
+    {:action :take-reserve-card, :player 0, :cr :sct}]
+   
+   [{:action :play-cards, :player 1, :cc :sea, :cv :sea}
+    {:action :take-reserve-card, :player 1, :cr :sct}
+    {:action :take-reserve-card, :player 1, :cr :brd}]])
 
 ;; The End

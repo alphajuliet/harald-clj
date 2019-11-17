@@ -32,6 +32,7 @@
    :villages (vec (repeat nplayers {}))
    :hands (vec (repeat nplayers {}))
    :reserve {}
+   :scores (vec (repeat nplayers 0))
    :turn 0})
 
 ;;-----------------------
@@ -49,6 +50,8 @@
 
 (def _reserve (l/key :reserve))
 (def _council (l/key :council))
+(def _scores (l/key :scores))
+(def _turn (l/key :turn))
 
 (defn _card [_h card] (comp _h (l/key card)))
 (defn _hand_card [plyr card] (_card (_hand plyr) card))
@@ -75,10 +78,22 @@
 ;;-----------------------
 ;; score-states :: State -> [Integer]
 (defn score-state
-  "Score the current state"
+  "Score the current state as a vector of scores."
   [st]
   (vec (scores (:council st)
                (:villages st))))
+
+;; end-of-game? :: State -> Boolean
+(defn end-of-game?
+  "Determine end of game"
+  [st]
+  (>= [:turn st] 10))
+
+;; TODO: implement bonus point scoring
+(defn end-score
+  "Score the final state."
+  [st]
+  st)
 
 ;;-----------------------
 (defn encode-hand

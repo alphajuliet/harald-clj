@@ -154,4 +154,12 @@
      :v2 v2
      :cv2 c2}))
 
+;;-------------------------------
+;; available-actions :: Int -> State -> [Action]
+(defn available-actions
+  ""
+  [player st]
+  (play-cards-options player st))
+
+
 ;; The End
