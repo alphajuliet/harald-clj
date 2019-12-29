@@ -1,14 +1,11 @@
-# harald
+# harald-clj
 
-A Clojure library designed to ... well, that part is up to you.
-
-## Usage
-
-FIXME
+Implement a game engine in Clojure for the strategy card game Harald. This is largely a
+port of my [original](https://github.com/alphajuliet/harald) version in Racket.
 
 ## License
 
-Copyright © 2019 FIXME
+Copyright © 2019 Andrew Joyner
 
 This program and the accompanying materials are made available under the
 terms of the Eclipse Public License 2.0 which is available at

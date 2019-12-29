@@ -157,7 +157,7 @@
 ;;-------------------------------
 ;; available-actions :: Int -> State -> [Action]
 (defn available-actions
-  ""
+  "List all the available actions for `player` given the `state`."
   [player st]
   (play-cards-options player st))
 

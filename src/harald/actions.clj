@@ -265,10 +265,10 @@
 ;; Example data
 
 (def s0 (init-game 3 0))
-(def s1 (play-cards 0 :mer :sea s0))
+(def s1 (play-cards 0 :mer :mer s0))
 
 (def a0
-  "Example action sequence."
+  "Example sequence of player turns."
   [[{:action :play-cards, :player 0, :cc :mer, :cv :mer}
     {:action :take-reserve-card, :player 0, :cr :sea}
     {:action :take-reserve-card, :player 0, :cr :sct}]
@@ -276,5 +276,7 @@
    [{:action :play-cards, :player 1, :cc :sea, :cv :sea}
     {:action :take-reserve-card, :player 1, :cr :sct}
     {:action :take-reserve-card, :player 1, :cr :brd}]])
+
+(def s2 (apply-game-actions a0 s0))
 
 ;; The End
