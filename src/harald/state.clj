@@ -2,8 +2,8 @@
 ;; AndrewJ 2019-11-04
 
 (ns harald.state
-  (:require [harald.hash-calc :as h]
-            [lentes.core :as l]))
+  (:require [numerimap.core :as n]
+            [clojure.spec.alpha :as s]))
 
 ;;-----------------------
 ;; Cards are:
@@ -15,59 +15,39 @@
 ;; - Scout/Wolf           -> Sct (green)
 
 (def card-types [:blk :war :brd :sea :mer :sct])
-(def all-cards [:blk :war :brd :sea :mer :sct
-                :blkX :warX :brdX :seaX :merX :sctX])
-(def null-hand {:blk 0 :war 0 :brd 0 :sea 0 :mer 0 :sct 0
-                :blkX 0 :warX 0 :brdX 0 :seaX 0 :merX 0 :sctX 0})
+(def all-cards (vec (concat card-types [:blkX :warX :brdX :seaX :merX :sctX])))
+(def null-hand (zipmap all-cards (repeat 0)))
 
 ;; A Hand is a collection of zero or more cards for each character. Stored as a hash table.
 ;; Examples of hands are: the council, each player's village, each player's own hand, and the
 ;; reserve pile available for restocking a player's hand.
+(s/def ::hand (s/map-of all-cards nat-int?))
 
-;; State :: Map Card Hand
+;;-----------------------
 (defn empty-state
   "Game state."
   [nplayers]
+  {:pre (>= nplayers 2)}
+
   {:council {}
-   :villages (vec (repeat nplayers {}))
-   :hands (vec (repeat nplayers {}))
+   :village (vec (repeat nplayers {}))
+   :hand (vec (repeat nplayers {}))
    :reserve {}
-   :scores (vec (repeat nplayers 0))
+   :score (vec (repeat nplayers 0))
    :turn 0})
 
-;;-----------------------
-;; Define some lenses
+(defn nplayers [st] (count (:village st)))
 
-(defn _hand
-  "A lens to hand n."
-  [n]
-  (comp (l/key :hands) (l/nth n)))
-
-(defn _village
-  "A lens to village n."
-  [n]
-  (comp (l/key :villages) (l/nth n)))
-
-(def _reserve (l/key :reserve))
-(def _council (l/key :council))
-(def _scores (l/key :scores))
-(def _turn (l/key :turn))
-
-(defn _card [_h card] (comp _h (l/key card)))
-(defn _hand_card [plyr card] (_card (_hand plyr) card))
-(defn _village_card [plyr card] (_card (_village plyr) card))
-
-(defn nplayers [st] (count (:villages st)))
 ;;-----------------------
 ;; score :: Hand -> Hand -> Integer
 (defn score
   "Score a player hand against a reference hand."
   [ref player]
-  (let [scoring-multiplier {:blk 1 :war 1 :brd 1 :sea 1 :mer 1 :sct 1
+  (let [scoring-multiplier {:blk  1 :war  1 :brd  1 :sea  1 :mer  1 :sct  1
                             :blkX 0 :warX 0 :brdX 0 :seaX 0 :merX 0 :sctX 0}]
-    (h/hash-sum (h/hash-mul scoring-multiplier
-                            (h/hash-mul ref
-                                        player)))))
+    (n/m-sum (n/m-mul scoring-multiplier
+                      (n/m-mul ref
+                               player)))))
 
 ;; scores :: Hand -> [Hand] -> [Integer]
 (defn scores
@@ -81,7 +61,7 @@
   "Score the current state as a vector of scores."
   [st]
   (vec (scores (:council st)
-               (:villages st))))
+               (:village st))))
 
 ;; end-of-game? :: State -> Boolean
 (defn end-of-game?
@@ -99,14 +79,14 @@
 (defn encode-hand
   "Encode the state as a vector with all types."
   [h]
-  (vec (vals (h/hash-add null-hand h))))
+  (vec (vals (n/m-add null-hand h))))
 
 (defn encode-state
   "Encode state in a compact form."
   [s]
   (vector (encode-hand (:council s))
-          (vec (flatten (map encode-hand (:hands s))))
-          (vec (flatten (map encode-hand (:villages s))))
+          (vec (flatten (map encode-hand (:hand s))))
+          (vec (flatten (map encode-hand (:village s))))
           (encode-hand (:reserve s))))
 
 ;; The End

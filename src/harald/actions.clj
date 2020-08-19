@@ -2,10 +2,9 @@
 ;; AndrewJ 2019-11-04
 
 (ns harald.actions
-  (:require [harald.state :refer :all]
-            [harald.hash-calc :as h]
-            [random-seed.core :as r]
-            [lentes.core :as l])
+  (:require [harald.state :as st]
+            [numerimap.core :as n]
+            [random-seed.core :as r])
   (:refer-clojure :exclude [rand rand-int rand-nth]))
 
 ;;-----------------------
@@ -15,39 +14,37 @@
 (defn deal-card
   "Select a random card."
   []
-  {(r/rand-nth card-types) 1})
+  {(r/rand-nth (seq st/card-types)) 1})
 
 ;; deal-n-cards :: Integer -> Hand -> Hand
 (defn deal-n-cards
   "Deal n random cards to a given pile."
   [n init-h]
   (reduce (fn [m _]
-            (h/hash-add (deal-card) m))
+            (n/m-add (deal-card) m))
           init-h
           (range n)))
 
-;; deal-reserve :: State -> State
+;; deal-to :: Hand -> State -> State
 (defn deal-to
   "Deal a card to a pile."
   [_dest st]
-  (l/over _dest (partial h/hash-add (deal-card)) st))
-
-#_(def >>> comp)
+  (update-in st _dest (partial n/m-add (deal-card))))
 
 ;; move-card :: Card -> Hand -> Hand -> State -> State
 (defn move-card
   "Move a card of type t from the src hand to the dest hand.
-   e.g. (move-card :blk (_hand 1) _council s0)."
+   e.g. (move-card :blk [:hand 1] [:council] s0)."
   [t _src _dest st]
 
   ;; Ensure the card is available
-  (if (or (not (contains? (l/focus _src st) t))
-          (<= (l/focus (comp _src (l/key t)) st) 0))
+  (if (or (not (contains? (get-in st _src) t))
+          (<= (get-in st (conj _src t)) 0))
     (throw (Exception.
             (format "### Error: card %s not available to move" t)))
-    (->> st
-         (l/over _dest (partial h/hash-add {t 1}))
-         (l/over _src #(h/hash-sub % {t 1})))))
+    (-> st
+         (update-in _dest (partial n/m-add {t 1}))
+         (update-in _src #(n/m-sub % {t 1})))))
 
 
 ;; swap-cards :: Card -> Lens Hand -> Card -> Lens Hand -> State -> State
@@ -62,18 +59,21 @@
 (defn invert
   "Turn over a card, e.g. (invert :sea) => :seaX"
   [c]
-  (all-cards (mod (+ 6 (.indexOf all-cards c)) 12)))
+  (get st/all-cards (mod (+ 6 (.indexOf st/all-cards c)) 12)))
 
-;; turn-over-card :: Card -> Lens Hand -> State -> State
+;; turn-over-card :: Lens Card -> State -> State
 (defn turn-over-card
   "Turn over an existing card"
-  [card _h st]
-  (if (nil? (l/focus (_card _h card) st))
+  [_card st]
+  (if (nil? (get-in st _card))
     (throw (Exception.
-            (format "### Card %s doesn't exist to turn over." card)))
-    (->> st
-         (l/over _h #(h/hash-sub % {card 1}))
-         (l/over _h #(h/hash-add % {(invert card) 1})))))
+            (format "### Card %s doesn't exist to turn over." _card)))
+    ; else
+    (let [card (last _card)
+          _hand (drop-last _card)]
+      (-> st
+          (update-in _card #(- % 1))
+          (update-in _hand #(n/m-add % {(invert card) 1}))))))
 
 ;===============================
 ;; Game actions
@@ -96,20 +96,23 @@
 
 
 ;;----------------------- 
-;; init-game :: Integer -> State
+;; init-game :: Integer (-> Integer)? -> State
 (defn init-game
   "Define the initial state."
-  [nplayers seed]
-  {:pre [(<= 2 nplayers 4)]}
+  ([nplayers]
+   (init-game nplayers 0))
 
-  (r/set-random-seed! seed)
+  ([nplayers seed]
+   {:pre [(<= 2 nplayers 4)]}
 
-  {:council {}
-   :villages (vec (repeat nplayers {}))
-   :hands (vec (repeatedly nplayers #(deal-n-cards 4 {})))
-   :reserve (deal-n-cards 4 {})
-   :scores (vec (repeat nplayers 0))
-   :turn 0})
+   (r/set-random-seed! seed)
+
+   {:council {}
+    :village (vec (repeat nplayers {}))
+    :hand (vec (repeatedly nplayers #(deal-n-cards 4 {})))
+    :reserve (deal-n-cards 4 {})
+    :score (vec (repeat nplayers 0))
+    :turn 0}))
 
 ;;----------------------- 
 ;; make-turn :: Player -> Card -> Card -> State -> State
@@ -117,8 +120,8 @@
   "Moves 1 and 2: play one card to council (cc) and one to the village (cv)."
   [player cc cv st]
   (->> st
-       (move-card cc (_hand player) _council)
-       (move-card cv (_hand player) (_village player))))
+       (move-card cc [:hand player] [:council])
+       (move-card cv [:hand player] [:village player])))
 
 ;-----------------------
 ; 
@@ -127,8 +130,8 @@
   "Take a reserve card into a player's hand, and deal a new card to the reserve."
   [player card st]
   (->> st
-       (move-card card _reserve (_hand player))
-       (deal-to _reserve)))
+       (move-card card [:reserve] [:hand player])
+       (deal-to [:reserve])))
 
 ;-----------------------
 (defn ->lens
@@ -143,25 +146,26 @@
 ; turn-over-cards :: [[Card Hand]] -> State -> State
 (defn turn-over-cards
   "(Blk effect) Turn over 0-2 cards in different villages or the council.
-   e.g. (turn-over-cards [[:blk [:village 0]], [:mer :council]] s0)"
+   e.g. (turn-over-cards [[:village 0 :blk] [:council :mer]] s0)"
   [cards st]
   {:pre [(<= 0 (count cards) 2)]}
   (reduce (fn [s x]
-            (turn-over-card (first x) (->lens (second x)) s))
+            (turn-over-card x s))
           st
           cards))
 
-;-----------------------
+                                        ;-----------------------
 ;; return-card :: Player -> Card -> State -> State
 (defn return-card
   "(War effect) Throw away a card from any player's village and replace with a random card."
   [player card st]
-  (if (nil? (l/focus (_village_card player card) st))
-    (throw (Exception. (format "### Card %s isn't available to remove." card)))
-    ;else
-    (->> st
-         (l/over (_village player) #(h/hash-sub % {card 1}))
-         (deal-to (_village player)))))
+  (if (nil? (get-in st [:village player card]))
+    (throw (Exception. (format "### Card )%s isn't available to remove." card)))
+                                        ;else
+    (as-> st <>
+      (update-in <> [:village player]
+                 #(n/m-sub % {card 1}))
+      (deal-to [:village player] <>))))
 
 ;;-----------------------
 ;; swap-hand-card :: Player -> Card -> Card -> State -> State
@@ -169,7 +173,7 @@
   "(Brd effect) Swap a hand card with your village card. 
   e.g. (swap-hand-village 0 :brd :mer s0)."
   [player ch cv st]
-  (swap-cards ch (_hand player) cv (_village player) st))
+  (swap-cards ch [:hand player] cv [:village player] st))
 
 ;-----------------------
 ; swap-council-card :: Player -> Card -> Card -> State -> State
@@ -177,25 +181,25 @@
   "(Sea effect) Swap any village card with a council card. 
    e.g. (swap-village-council 0 :brd :mer s0)."
   [p cv cc st]
-  (swap-cards cv (_village p) cc _council st))
+  (swap-cards cv [:village p] cc [:council] st))
 
 ;-----------------------
 ; swap-village-card :: Player -> Card -> Player -> Card -> State -> State
 (defn swap-village-village
   "(Mer effect) Swap two village cards."
   [p1 cv1 p2 cv2 st]
-  (swap-cards cv1 (_village p1) cv2 (_village p2) st))
+  (swap-cards cv1 [:village p1] cv2 [:village p2] st))
 
 ;-----------------------
 (defn update-score
   "Update the scores."
   [st]
-  (l/put _scores (score-state st) st))
+  (assoc-in st [:score] (st/score-state st)))
 
 (defn advance-turn
   "Advance the turn number by one."
   [st]
-  (l/over _turn inc st))
+  (update-in st [:turn] inc))
 
 ;;-----------------------
 ;; Dispatch on actions
@@ -273,9 +277,9 @@
     {:action :take-reserve-card, :player 0, :cr :sea}
     {:action :take-reserve-card, :player 0, :cr :sct}]
    
-   [{:action :play-cards, :player 1, :cc :sea, :cv :sea}
-    {:action :take-reserve-card, :player 1, :cr :sct}
-    {:action :take-reserve-card, :player 1, :cr :brd}]])
+   [{:action :play-cards, :player 1, :cc :war, :cv :blk}
+    {:action :take-reserve-card, :player 1, :cr :brd}
+    {:action :take-reserve-card, :player 1, :cr :sct}]])
 
 (def s2 (apply-game-actions a0 s0))
 
