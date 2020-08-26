@@ -124,7 +124,6 @@
        (move-card cv [:hand player] [:village player])))
 
 ;-----------------------
-; 
 ; take-reserve-card :: Player -> Card -> State -> State
 (defn take-reserve-card
   "Take a reserve card into a player's hand, and deal a new card to the reserve."
@@ -134,15 +133,6 @@
        (deal-to [:reserve])))
 
 ;-----------------------
-(defn ->lens
-  "Convert a description to a lens"
-  [d]
-  (if (vector? d)
-    (comp (l/key (first d)) (l/nth (second d)))
-    ;else
-    (l/key d)))
-
-
 ; turn-over-cards :: [[Card Hand]] -> State -> State
 (defn turn-over-cards
   "(Blk effect) Turn over 0-2 cards in different villages or the council.
