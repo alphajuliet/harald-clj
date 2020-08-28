@@ -1,10 +1,9 @@
 ;; game.clj
 
 (ns harald.game
-  (:require [harald.state :refer :all]
-            [harald.actions :refer :all]
+  (:require [harald.state :as st]
+            [harald.actions :as act]
             [harald.hash-calc :as h]
-            [lentes.core :as l]
             [random-seed.core :as r]
             [clojure.math.combinatorics :as c]
             [clojure.java.io :as io])
@@ -35,12 +34,14 @@
 ;; Utilities
 
 (defn val-combinations
-  "Return all combinations of the enumerated values in a numeric map of length `n`."
+  "Return all combinations of the enumerated values in a numeric
+   map of length `n`."
   [m n]
   (distinct (c/combinations (h/hash-enumerate m) n)))
 
 (defn val-permutations
-  "Return all permutations of length `n` of the enumerated values in numeric map `m`."
+  "Return all permutations of length `n` of the enumerated values in
+   a numeric map `m`."
   [m n]
   (distinct (c/permuted-combinations (h/hash-enumerate m) n)))
 
@@ -52,7 +53,7 @@
 (defn play-cards-options
   "Generate all play-card actions for a player `player`."
   [player st]
-  (for [c (val-permutations (l/focus (_hand player) st) 2)]
+  (for [c (val-permutations (get-in st [:hand player]) 2)]
     {:action :play-cards
      :player player
      :cc (first c)
@@ -63,7 +64,7 @@
 (defn take-reserve-card-options
   "Generate all take-reserve-card actions."
   [player st]
-  (for [c (keys (l/focus _reserve st))]
+  (for [c (keys (:reserve st))]
     {:action :take-reserve-card
      :player player
      :card c}))
@@ -72,7 +73,7 @@
 ;; get-pairs :: LensX -> State -> [[Card LensX]]
 (defn- get-pairs
   [h st]
-  (->> (keys (l/focus (->lens h) st))
+  (->> (keys (get-in st h))
        (map #(vector % h))))
 
 ;; get-location-cards :: State -> [[Card LensX]]
@@ -100,7 +101,7 @@
        (into (get-location-cards st)) ; options for 1 card
        (cons [])                      ; options for 0 cards
        (map (fn [p] {:action :turn-over-cards
-                     :cards p}))))
+                    :cards p}))))
 
 ;;-------------------------------
 ;; return-card-options :: State -> [Action]
@@ -108,7 +109,7 @@
   "Generate all the options for returning any village card."
   [st]
   (for [p (range (nplayers st))
-        c (h/hash-enumerate (l/focus (_village p) st))]
+        c (h/hash-enumerate (get-in st [:village p]))]
     {:action :return-card
      :player p
      :card c}))
@@ -118,8 +119,8 @@
 (defn swap-hand-village-options
   "Generate all options for swapping a hand card with a village card."
   [player st]
-  (for [ch (h/hash-enumerate (l/focus (_hand player) st))
-        cv (h/hash-enumerate (l/focus (_village player) st))]
+  (for [ch (h/hash-enumerate (get-in st [:hand player]))
+        cv (h/hash-enumerate (get-in st [:village player]))]
     {:action :swap-hand-village
      :player player
      :ch ch
@@ -131,8 +132,8 @@
   "Generate all options for swapping a village card with a council card."
   [st]
   (for [p (range (nplayers st))
-        cv (h/hash-enumerate (l/focus (_village p) st))
-        cc (h/hash-enumerate (l/focus _council st))]
+        cv (h/hash-enumerate (get-in st [:village p]))
+        cc (h/hash-enumerate (:council st))]
     {:action :swap-village-council
      :village p
      :cv cv
@@ -143,9 +144,9 @@
   "Generate all options for swapping two cards from different villages."
   [st]
   (for [v1 (range (nplayers st))
-        c1 (h/hash-enumerate (l/focus (_village v1) st))
+        c1 (h/hash-enumerate (get-in st [:village v1]))
         v2 (range (nplayers st))
-        c2 (h/hash-enumerate (l/focus (_village v2) st))
+        c2 (h/hash-enumerate (get-in st [:village v2]))
         :when (< v1 v2)
         :when (not (= c1 c2))]
     {:action :swap-village-village

@@ -3,9 +3,9 @@
 ;; AndrewJ 2019-11-16
 
 (ns harald.policy
-  (:require [harald.state :refer :all]
-            [harald.actions :refer :all]
-            [harald.game :refer :all]
+  (:require [harald.state :as st]
+            [harald.actions :as act]
+            [harald.game :as g]
             [harald.hash-calc :as h]
             [clojure.java.io :as io]))
 
@@ -46,9 +46,9 @@
   "Apply a given policy function to generate the next state."
   [policy plyr st]
   (let [action (policy plyr st)
-        new-state (apply-action action st)]
-    (log action)
-    (log (encode-state plyr new-state))
+        new-state (act/apply-action action st)]
+    (g/log action)
+    (g/log (st/encode-state new-state))
     new-state))
 
 ;-------------------------------
@@ -61,16 +61,16 @@
 
   ([policy-a policy-b initial-state max-turns]
    ; Log the initial state
-   (log (encode-state :a initial-state))
-   (log (encode-state :b initial-state))
+   (g/log (st/encode-state initial-state))
+   (g/log (st/encode-state initial-state))
 
   ; Iterate through the actions for each player to generate a final state
    (reduce
     (fn [state i]
-      (if (end-of-game? state)
-        (reduced (end-score state))
+      (if (st/end-of-game? state)
+        (reduced (st/end-score state))
         (do
-          (log (format "---- Iteration %d:" i))
+          (g/log (format "---- Iteration %d:" i))
           (->> state
                (apply-policy policy-a :a)
                (apply-policy policy-b :b)))))
@@ -98,7 +98,7 @@
 (defn random-policy
   "Choose a random action from the ones available."
   [player state]
-  (->> (available-actions player state)
+  (->> (g/available-actions player state)
        (group-by first)
        (random-value)
        (rand-nth)))
@@ -112,8 +112,8 @@
 (defn greedy-policy
   "Choose the available action that maximises the points in the target states. If none, then pick a random one."
   [player state]
-  (argmax #(points player (apply-action % state))
-          (shuffle (available-actions player state))))
+  (argmax #(score player (act/apply-action % state))
+          (shuffle (g/available-actions player state))))
 
 ; points-delta :: Player -> State -> State -> Integer
 (defn score-delta
@@ -128,7 +128,7 @@
   "Maximise difference in points between current and next state."
   [player state]
 
-  (argmax #(score-delta player state (apply-action % state))
-          (available-actions player state)))
+  (argmax #(score-delta player state (act/apply-action % state))
+          (g/available-actions player state)))
 
 ;; The End

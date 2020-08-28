@@ -95,7 +95,7 @@
 ;; - Apply effect from council card instead (Scout effect)
 
 
-;;----------------------- 
+;;-----------------------
 ;; init-game :: Integer (-> Integer)? -> State
 (defn init-game
   "Define the initial state."
@@ -114,7 +114,7 @@
     :score (vec (repeat nplayers 0))
     :turn 0}))
 
-;;----------------------- 
+;;-----------------------
 ;; make-turn :: Player -> Card -> Card -> State -> State
 (defn play-cards
   "Moves 1 and 2: play one card to council (cc) and one to the village (cv)."
@@ -153,8 +153,7 @@
     (throw (Exception. (format "### Card )%s isn't available to remove." card)))
                                         ;else
     (as-> st <>
-      (update-in <> [:village player]
-                 #(n/m-sub % {card 1}))
+      (update-in <> [:village player] #(n/m-sub % {card 1}))
       (deal-to [:village player] <>))))
 
 ;;-----------------------
@@ -266,7 +265,7 @@
   [[{:action :play-cards, :player 0, :cc :mer, :cv :mer}
     {:action :take-reserve-card, :player 0, :cr :sea}
     {:action :take-reserve-card, :player 0, :cr :sct}]
-   
+
    [{:action :play-cards, :player 1, :cc :war, :cv :blk}
     {:action :take-reserve-card, :player 1, :cr :brd}
     {:action :take-reserve-card, :player 1, :cr :sct}]])
