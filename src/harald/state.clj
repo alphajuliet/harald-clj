@@ -67,9 +67,9 @@
 (defn end-of-game?
   "Determine end of game"
   [st]
-  (>= [:turn st] 10))
+  (>= (:turn st) 10))
 
-;; TODO: implement bonus point scoring
+;; @@TODO: implement bonus point scoring
 (defn end-score
   "Score the final state."
   [st]

@@ -12,7 +12,7 @@
 ;;-------------------------------
 ;; Utility functions
 
-; random-value :: Hash a b -> b
+;; random-value :: Hash a b -> b
 (def random-value (comp rand-nth vals))
 
 (defn argmax-map
@@ -30,52 +30,55 @@
   [f xs]
   (apply min-key f xs))
 
-; From https://stackoverflow.com/questions/1601321/idiomatic-mode-function-in-clojure
+;; From https://stackoverflow.com/questions/1601321/idiomatic-mode-function-in-clojure
 (defn tally-map
-  " Create a map where the keys are all of the unique elements in the input
+  "Create a map where the keys are all of the unique elements in the input
    sequence and the values represent the number of times those elements
    occur. Note that the keys may not be formatted as conventional Clojure
    keys, i.e. a colon preceding a symbol."
   [aseq]
   (apply merge-with + (map (fn [x] {x 1}) aseq)))
 
-;-------------------------------
-; type Policy = Player -> State -> Action
-; apply-policy :: Policy -> Player -> State -> State
+;;-------------------------------
+;; type Policy = Player -> State -> Action
+;; apply-policy :: Policy -> Player -> State -> State
 (defn apply-policy
-  "Apply a given policy function to generate the next state."
-  [policy plyr st]
-  (let [action (policy plyr st)
+  "Apply a given policy function for a player, to generate the next state."
+  [policy-fn plyr st]
+  {:pre (int? plyr)}
+
+  (let [action (policy-fn plyr st)
         new-state (act/apply-action action st)]
     (g/log action)
     (g/log (st/encode-state new-state))
     new-state))
 
-;-------------------------------
-; play-game :: Policy -> State -> State
+;;-------------------------------
+;; play-game :: Policy -> State -> State
 (defn play-game
-  "Play a game with a policy function for each player. 
-   Limit the number of turns per player to `max-turns` with default 100."
-  ([policy-a policy-b initial-state]
-   (play-game policy-a policy-b initial-state 100))
+  "Play a game with a policy function for each player."
+  [policies initial-state]
+  {:pre (= (count policies) (st/nplayers initial-state))}
 
-  ([policy-a policy-b initial-state max-turns]
-   ; Log the initial state
-   (g/log (st/encode-state initial-state))
-   (g/log (st/encode-state initial-state))
+  ;; Log the initial state
+  (g/log (st/encode-state initial-state))
 
-  ; Iterate through the actions for each player to generate a final state
-   (reduce
-    (fn [state i]
-      (if (st/end-of-game? state)
-        (reduced (st/end-score state))
-        (do
-          (g/log (format "---- Iteration %d:" i))
-          (->> state
-               (apply-policy policy-a :a)
-               (apply-policy policy-b :b)))))
-    initial-state
-    (range max-turns))))
+  ;; Iterate over 10 turns through the actions for each player to generate a
+  ;; final state
+  (reduce
+   (fn [state turn]
+     (do
+       (g/log (format "---- Turn %d:" turn))
+       (as-> state <>
+         (reduce (fn [st j] (apply-policy (nth policies j) j st))
+                <>
+                (range (count policies)))
+         ;; Update the turn number
+         (update <> :turn inc)
+         ;; Update the score
+         (assoc <> :score (st/score-state <>)))))
+   initial-state
+   (range 10)))
 
 (defn winner
   "Identify the winner"
@@ -94,7 +97,7 @@
 ;;-------------------------------
 ;; Policies
 
-; random-policy :: Player -> State -> Action
+;; random-policy :: Player -> State -> Action
 (defn random-policy
   "Choose a random action from the ones available."
   [player state]
@@ -108,26 +111,24 @@
   [player st]
   (get-in st [:scores player]))
 
-; greedy-policy :: Player -> State -> Action
+;; greedy-policy :: Player -> State -> Action
 (defn greedy-policy
   "Choose the available action that maximises the points in the target states. If none, then pick a random one."
   [player state]
   (argmax #(score player (act/apply-action % state))
           (shuffle (g/available-actions player state))))
 
-; points-delta :: Player -> State -> State -> Integer
+;; points-delta :: Player -> State -> State -> Integer
 (defn score-delta
   "Measure the score difference between two states."
   [player curr-st next-st]
-
   (- (score player next-st)
      (score player curr-st)))
 
-; alpha-policy :: Player -> State -> Action
+;; alpha-policy :: Player -> State -> Action
 (defn alpha-policy
   "Maximise difference in points between current and next state."
   [player state]
-
   (argmax #(score-delta player state (act/apply-action % state))
           (g/available-actions player state)))
 

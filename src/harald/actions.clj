@@ -123,8 +123,8 @@
        (move-card cc [:hand player] [:council])
        (move-card cv [:hand player] [:village player])))
 
-;-----------------------
-; take-reserve-card :: Player -> Card -> State -> State
+;;-----------------------
+;; take-reserve-card :: Player -> Card -> State -> State
 (defn take-reserve-card
   "Take a reserve card into a player's hand, and deal a new card to the reserve."
   [player card st]
@@ -132,8 +132,8 @@
        (move-card card [:reserve] [:hand player])
        (deal-to [:reserve])))
 
-;-----------------------
-; turn-over-cards :: [[Card Hand]] -> State -> State
+;;-----------------------
+;; turn-over-cards :: [[Card Hand]] -> State -> State
 (defn turn-over-cards
   "(Blk effect) Turn over 0-2 cards in different villages or the council.
    e.g. (turn-over-cards [[:village 0 :blk] [:council :mer]] s0)"
@@ -144,7 +144,7 @@
           st
           cards))
 
-                                        ;-----------------------
+;;-----------------------
 ;; return-card :: Player -> Card -> State -> State
 (defn return-card
   "(War effect) Throw away a card from any player's village and replace with a random card."
@@ -164,22 +164,22 @@
   [player ch cv st]
   (swap-cards ch [:hand player] cv [:village player] st))
 
-;-----------------------
-; swap-council-card :: Player -> Card -> Card -> State -> State
+;;-----------------------
+;; swap-council-card :: Player -> Card -> Card -> State -> State
 (defn swap-village-council
   "(Sea effect) Swap any village card with a council card. 
    e.g. (swap-village-council 0 :brd :mer s0)."
   [p cv cc st]
   (swap-cards cv [:village p] cc [:council] st))
 
-;-----------------------
-; swap-village-card :: Player -> Card -> Player -> Card -> State -> State
+;;-----------------------
+;; swap-village-card :: Player -> Card -> Player -> Card -> State -> State
 (defn swap-village-village
   "(Mer effect) Swap two village cards."
   [p1 cv1 p2 cv2 st]
   (swap-cards cv1 [:village p1] cv2 [:village p2] st))
 
-;-----------------------
+;;-----------------------
 (defn update-score
   "Update the scores."
   [st]
@@ -204,6 +204,7 @@
 (defmethod do-action :take-reserve-card
   [{:keys [action player cr state]}]
   (take-reserve-card player cr state))
+
 
 (defmethod do-action :turn-over-cards
   [{:keys [action cards state]}]
@@ -234,13 +235,15 @@
   [cmd state]
   {:pre [(map? cmd)
          (map? state)]}
+
   (->> (into cmd {:state state}) ; first inject the current state
        (do-action)))
 
-; apply-player-actions :: [(m ... -> State -> State)] -> State -> State
+;; apply-player-actions :: [(m ... -> State -> State)] -> State -> State
 (defn apply-player-actions
-  "Apply a series of actions in a player's turn to an initial state, update the scores, and increment the turn.
-  The first action must be `play-cards`, then an optional effect action, followed by two `take-reserve-card` actions."
+  "Apply a series of actions in a player's turn to an initial state, update the
+  scores, and increment the turn. The first action must be `play-cards`, then an
+  optional effect action, followed by two `take-reserve-card` actions."
   [cmds init-state]
   {:pre (<= 3 (count cmds) 4)}
   (->> cmds
