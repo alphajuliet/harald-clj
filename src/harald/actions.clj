@@ -20,10 +20,8 @@
 (defn deal-n-cards
   "Deal n random cards to a given pile."
   [n init-h]
-  (reduce (fn [m _]
-            (n/m-add (deal-card) m))
-          init-h
-          (range n)))
+  (n/m-add init-h
+           (apply n/m-add (repeatedly n #(deal-card)))))
 
 ;; deal-to :: Hand -> State -> State
 (defn deal-to
@@ -75,7 +73,7 @@
           (update-in _card #(- % 1))
           (update-in _hand #(n/m-add % {(invert card) 1}))))))
 
-;===============================
+;;===============================
 ;; Game actions
 ;; - Init game
 ;; - Player turn
@@ -86,7 +84,7 @@
 ;;   5. Deal new card to reserve
 ;;   6. Take card from reserve
 ;;
-;; Effects
+;; Effects from hand card:
 ;; - Turn over 0-2 village or council cards (Blacksmith effect)
 ;; - Replace any village card with a random card (Warrior effect)
 ;; - Swap hand card with own village card (Bard effect)
@@ -98,7 +96,7 @@
 ;;-----------------------
 ;; init-game :: Integer (-> Integer)? -> State
 (defn init-game
-  "Define the initial state."
+  "Define the initial state, and seed the random number generator."
   ([nplayers]
    (init-game nplayers 0))
 
@@ -139,8 +137,8 @@
    e.g. (turn-over-cards [[:village 0 :blk] [:council :mer]] s0)"
   [cards st]
   {:pre [(<= 0 (count cards) 2)]}
-  (reduce (fn [s x]
-            (turn-over-card x s))
+  (reduce (fn [s c]
+            (turn-over-card c s))
           st
           cards))
 
@@ -151,7 +149,7 @@
   [player card st]
   (if (nil? (get-in st [:village player card]))
     (throw (Exception. (format "### Card )%s isn't available to remove." card)))
-                                        ;else
+    ;;else
     (as-> st <>
       (update-in <> [:village player] #(n/m-sub % {card 1}))
       (deal-to [:village player] <>))))
@@ -159,7 +157,7 @@
 ;;-----------------------
 ;; swap-hand-card :: Player -> Card -> Card -> State -> State
 (defn swap-hand-village
-  "(Brd effect) Swap a hand card with your village card. 
+  "(Brd effect) Swap a hand card with your village card.
   e.g. (swap-hand-village 0 :brd :mer s0)."
   [player ch cv st]
   (swap-cards ch [:hand player] cv [:village player] st))
@@ -167,7 +165,7 @@
 ;;-----------------------
 ;; swap-council-card :: Player -> Card -> Card -> State -> State
 (defn swap-village-council
-  "(Sea effect) Swap any village card with a council card. 
+  "(Sea effect) Swap any village card with a council card.
    e.g. (swap-village-council 0 :brd :mer s0)."
   [p cv cc st]
   (swap-cards cv [:village p] cc [:council] st))
